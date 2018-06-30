@@ -1,0 +1,84 @@
+# Prediction assignment writeup
+
+##Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively.  One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways and we will try to predict whether or not the exercises performed by participants used proper form or not.
+
+## Data preprocessing
+
+### Loading libraries
+
+```{r}
+library(caret)
+```
+
+### reading the data
+
+```{r}
+trainingInit <- read.csv("./pml-training.csv")
+testingInit <- read.csv("./pml-testing.csv")
+```
+
+### Cleaning the data
+
+First of all we will remove the predictors with NA values from both training and testing sets 
+
+```{r}
+colRemove <- colSums(is.na(trainingInit))==0
+trainingCleaned1 <- trainingInit[,colRemove]
+testingCleaned1 <- testingInit[,colRemove]
+```
+
+
+Also we will remove time related columns from both training and testing data sets as they will not be useful in our prediction.
+
+```{r}
+trainingCleaned2 <- trainingCleaned1[,-c(3:5)]
+testingCleaned2 <- testingCleaned1[,-c(3:5)]
+```
+
+
+Although we didn't identify the machine learning algorithm that we will use till now, we think that removing predictors with non zero varability because basically this will summarize the data and will make it easier for some algorthims to work smoothly
+
+```{r}
+nzv <- nearZeroVar(trainingCleaned2,saveMetrics = TRUE)
+trainingCleaned <- trainingCleaned2[,nzv$nzv==FALSE]
+testingCleaned <- testingCleaned2[,nzv$nzv==FALSE]
+```
+
+## Training data partitioning
+
+In this part we will split our training data into 2 parts training data that will be used to build our model(70%) and a validation data set(30%) which we will use to test our model
+
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(trainingCleaned$classe,p=0.7,list = FALSE)
+training <- trainingCleaned[inTrain,]
+trainingCV <- trainingCleaned[-inTrain,]
+```
+
+## Data modeling
+
+We slected Random Forest algorithm for prediction because of the high accuracy of this algorithm noting that k-fold cross validation is used and we set k as 4 to compromise betweek bias and variance.
+
+```{r}
+modFit <- train(classe ~ . ,data = training, method = "rf", ntrees = 100, trControl = trainControl(method="cv", 4))
+modFit
+```
+
+Now let's check how the model will perform in the validation part of the data
+
+```{r}
+predictCV <- predict(modFit, trainingCV)
+confusionMatrix(trainingCV$classe, predictCV)
+```
+
+We can find from the above output that accuracy is 99.99% which is really good value and the out-of-sample error is less than 0.01% so we can conclude that using random forest is excellent choice for predicting the data.
+
+## Testing set prediction
+
+We can use the model to predict classe for each observation in the training set.
+
+```{r}
+predictTesting <- predict(modFit, testingCleaned)
+```
